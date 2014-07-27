@@ -1,0 +1,299 @@
+---
+title: 'Severe Weather Events: Public Health and Economic Impact'
+author: "Desmond Wallace"
+date: "Sunday, July 27, 2014"
+output:
+  html_document:
+    keep_md: yes
+    toc: yes
+---
+
+## Synopsis
+
+It is known to many that severe weather events, such as thunderstorms, results in a host of problems for the communities and municipalities affected by such events. These problems include, but are not limited to, economic and public health problems. Not only are communities and municipalities are affected by severe weather events, individuals residing in these locations are affected as well. The reason for this is that severe weather events are capable of causing severe hardships, such as fatalities, injuries, and property damage. Thus, the main concern facing policymakers is minimizing these hardships as best as possible.
+
+In this report, we examine the impact severe weather has on both local public health and economy. Using the storm database compiled by the United States National Oceanic and Atmospheric Administration (NOAA) from 1950 - 2011, two major findings are revealed. First, there is a difference with regards to which severe weather events has the most impact on public health. Tornadoes has the biggest impact on public health when examining the entire period covered by the data set, while excessive heat and tornadoes have the biggest impact on public health for the period beginning in 1990. Second, floods and droughts have the biggest economic impact on communities and municipalities, irrespective of period.
+
+
+## Settings
+
+Before I conduct any data processing or analysis, I will first load the necessary packages in order to conduct such processes.
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+library(plyr)
+library(R.utils)
+```
+
+
+## Data Processing
+
+The first step in processing the data is to download, and unzip, the data file. The data file can be downloaded from the following link: [https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2)
+
+```{r}
+# Unzipping data file
+bunzip2("repdata-data-StormData.csv.bz2", overwrite = TRUE, remove = FALSE)
+```
+
+The next step is to read the .csv file, which contains the data, into R.
+
+```{r}
+Storms <- read.csv("repdata-data-StormData.csv")
+```
+
+
+## Overview of Data
+
+The following code displays the first six entries in the data set.
+
+```{r}
+head(Storms)
+```
+
+The following code displays the last six entries in the data set
+
+```{r}
+tail(Storms)
+```
+
+Finally, the following code displays summary statistics for the data set.
+
+```{r}
+summary(Storms)
+```
+
+According to the results displayed above, the data set begins in 1950, and ends in 2011. Most likely due to poor record-keeping, more events are recorded for later years as compared to the early years. This trend is displayed visually in the following histogram.
+
+```{r}
+# Create a new variable: "year"
+Storms$YEAR <- as.numeric(format(as.Date(Storms$BGN_DATE, 
+                                       format = "%m/%d/%Y %H:%M:%S"), "%Y"))
+
+# Create histogram that shows growth in number of completed records
+hist(Storms$YEAR, xlab = "Year", main = "Number of Records per Year")
+```
+
+According to the histogram above, the bulk of the records occur after 1990. Thus, the results section will include plots that not only utilize the entire data set, but also a subset of the whole data set, with emphasis on the years 1990 to 2011.
+
+```{r}
+# Create subset of dataset, for years 1990 to 2011.
+Storms.9011 <- Storms[Storms$YEAR >= 1990, ]
+```
+
+
+## Results
+
+In this section, we analyze the data in order to answer the following questions:
+
+* Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+* Across the United States, which types of events have the greatest economic consequences?
+
+### Public Health Impact
+
+In this section, we identify the ***fatalities*** and ***injuries*** that are most caused by severe weather events. The first set of code helps identify the fatalities and injuries most caused by severe weather events for the complete period covered by the data set.
+
+```{r}
+# Aggregating Fatalities and Injuries from Original Dataset
+sortingPubHealth <- function(pubhealth, top = 20, data = Storms) {
+    ind <- which(colnames(data) == pubhealth)
+    ph <- aggregate(data[, ind], by = list(data$EVTYPE), FUN = "sum")
+    names(ph) <- c("EVTYPE", pubhealth)
+    ph <- arrange(ph, ph[, 2], decreasing = TRUE)
+    ph <- head(ph, n = top)
+    ph <- within(ph, EVTYPE <- factor(x = EVTYPE, levels = ph$EVTYPE))
+    return(ph)
+}
+
+# Aggregating Fatalities and Injuries from Subset Dataset
+sortingPubHealth.9011 <- function(pubhealth, top = 20, data = Storms.9011) {
+    ind <- which(colnames(data) == pubhealth)
+    ph <- aggregate(data[, ind], by = list(data$EVTYPE), FUN = "sum")
+    names(ph) <- c("EVTYPE", pubhealth)
+    ph <- arrange(ph, ph[, 2], decreasing = TRUE)
+    ph <- head(ph, n = top)
+    ph <- within(ph, EVTYPE <- factor(x = EVTYPE, levels = ph$EVTYPE))
+    return(ph)
+}
+
+# List of Fatalities and Injuries from Original Dataset
+Fatalities <- sortingPubHealth("FATALITIES", data = Storms)
+Injuries <- sortingPubHealth("INJURIES", data = Storms)
+
+# List of Fatalities and Injuries from Subset Dataset
+Fatalities.9011 <- sortingPubHealth("FATALITIES", data = Storms.9011)
+Injuries.9011 <- sortingPubHealth("INJURIES", data = Storms.9011)
+```
+
+### Economic Impact
+
+In this section, we convert both ***property*** and ***crop*** damages into their respective numerical forms for proper data analysis. Again, this process is done for both the original and subset data sets.
+
+```{r}
+# Conversion for Original Dataset
+convertingEcon <- function(data = Storms, damage, newdamage) {
+  totlen <- dim(data)[2]
+  ind <- which(colnames(data) == damage)
+  data[, ind] <- as.character(data[, ind])
+  log <- !is.na(toupper(data[, ind]))
+  data[log & toupper(data[, ind]) == "B", ind] <- "9"
+  data[log & toupper(data[, ind]) == "M", ind] <- "6"
+  data[log & toupper(data[, ind]) == "K", ind] <- "3"
+  data[log & toupper(data[, ind]) == "H", ind] <- "2"
+  data[log & toupper(data[, ind]) == "", ind] <- "0"
+  data[, ind] <- as.numeric(data[, ind])
+  data[is.na(data[, ind]), ind] <- 0
+  data <- cbind(data, data[, ind - 1] * 10^data[, ind])
+  names(data)[totlen + 1] <- newdamage
+  return(data)
+}
+
+Storms <- convertingEcon(Storms, "PROPDMGEXP", "PropertyDamage")
+Storms <- convertingEcon(Storms, "CROPDMGEXP", "CropDamage")
+
+# Conversion for Subset Dataset 
+convertingEcon.9011 <- function(data = Storms.9011, damage, newdamage) {
+  totlen <- dim(data)[2]
+  ind <- which(colnames(data) == damage)
+  data[, ind] <- as.character(data[, ind])
+  log <- !is.na(toupper(data[, ind]))
+  data[log & toupper(data[, ind]) == "B", ind] <- "9"
+  data[log & toupper(data[, ind]) == "M", ind] <- "6"
+  data[log & toupper(data[, ind]) == "K", ind] <- "3"
+  data[log & toupper(data[, ind]) == "H", ind] <- "2"
+  data[log & toupper(data[, ind]) == "", ind] <- "0"
+  data[, ind] <- as.numeric(data[, ind])
+  data[is.na(data[, ind]), ind] <- 0
+  data <- cbind(data, data[, ind - 1] * 10^data[, ind])
+  names(data)[totlen + 1] <- newdamage
+  return(data)
+}
+
+Storms.9011 <- convertingEcon(Storms.9011, "PROPDMGEXP", "PropertyDamage")
+Storms.9011 <- convertingEcon(Storms.9011, "CROPDMGEXP", "CropDamage")
+
+
+# Aggregating Property and Crop Damages from Original Dataset
+sortingDamage <- function(damage, top = 20, data = Storms) {
+    ind <- which(colnames(data) == damage)
+    dmg <- aggregate(data[, ind], by = list(data$EVTYPE), FUN = "sum")
+    names(dmg) <- c("EVTYPE", damage)
+    dmg <- arrange(dmg, dmg[, 2], decreasing = TRUE)
+    dmg <- head(dmg, n = top)
+    dmg <- within(dmg, EVTYPE <- factor(x = EVTYPE, levels = dmg$EVTYPE))
+    return(dmg)
+}
+
+# Aggregating Property and Crop Damages from Subset Dataset
+sortingDamage.9011 <- function(damage, top = 20, data = Storms.9011) {
+    ind <- which(colnames(data) == damage)
+    dmg <- aggregate(data[, ind], by = list(data$EVTYPE), FUN = "sum")
+    names(dmg) <- c("EVTYPE", damage)
+    dmg <- arrange(dmg, dmg[, 2], decreasing = TRUE)
+    dmg <- head(dmg, n = top)
+    dmg <- within(dmg, EVTYPE <- factor(x = EVTYPE, levels = dmg$EVTYPE))
+    return(dmg)
+}
+
+# List of Property and Crop Damages from Original Dataset
+Property <- sortingDamage("PropertyDamage", data = Storms)
+Crops <- sortingDamage("CropDamage", data = Storms)
+
+# List of Property and Crop Damages from Subset Dataset
+Property.9011 <- sortingDamage("PropertyDamage", data = Storms.9011)
+Crops.9011 <- sortingDamage("CropDamage", data = Storms.9011)
+```
+
+### Analysis and Figures - Public Health Impact
+
+After compiling the code above, we now have four sorted lists which shows the impact severe weather has on public health, based on the number of individuals affected. Listed below are the two sorted lists based on the original data set.
+
+```{r}
+# Sorted Lists for Original Dataset
+Fatalities
+Injuries
+```
+
+Below are two histograms that show the impact severe weather events have on public health. These histograms reflect the data from the original data set.
+
+```{r}
+FatalitiesGraph <- qplot(EVTYPE, data = Fatalities, weight = FATALITIES, 
+                         geom = "bar") + scale_y_continuous("FATALITIES") +
+                         theme(axis.text.x = element_text(angle = 90, 
+                                                          hjust = 1)) +
+                         xlab("Severe Weather") + 
+                         ggtitle("Total Number of Fatalities\n by Severe 
+                                Weather Type\n in the U.S. from 1950 - 2011")
+InjuriesGraph <- qplot(EVTYPE, data = Injuries, weight = INJURIES, 
+                       geom = "bar") + scale_y_continuous("INJURIES") +
+                       theme(axis.text.x = element_text(angle = 90, 
+                                                          hjust = 1)) +
+                       xlab("Severe Weather") + 
+                       ggtitle("Total Number of Injuries\n by Severe 
+                                Weather Type\n in the U.S. from 1950 - 2011")
+grid.arrange(FatalitiesGraph, InjuriesGraph, ncol = 2)
+```
+
+Based on the lists and graphs above, the severe weather event that has the biggest impact on communities and municipalities, based on the total number of fatalities and injuries, are **tornadoes**.
+
+Listed below are the sorted lists of fatalities and injuries, based on the subset data set.
+
+```{r}
+# Sorted Lists for Subset Dataset
+Fatalities.9011
+Injuries.9011
+```
+
+Based on these lists, tornadoes remain the biggest cause of injuries. However, the severe weather event most responsible for the total number of fatalities, between the period of 1990 and 2011, is **excessive heat**.
+
+### Analysis and Figures - Economic Impact
+
+Listed below are two sorted lists, based on the original data set, which shows the impact severe weather has on property and crops.
+
+```{r}
+# Sorted Lists for Original Dataset
+Property
+Crops
+```
+
+Below are two histograms that shows the economic impact severe weather has on communities and municipalities. Again, these histograms reflect the data from the original data set.
+
+```{r}
+PropertyGraph <- qplot(EVTYPE, data = Property, weight = PropertyDamage, 
+                       geom = "bar") + 
+                       scale_y_continuous("Property Damage in USD") +
+                       theme(axis.text.x = element_text(angle = 90, 
+                                                        hjust = 1)) +
+                       xlab("Severe Weather") + 
+                       ggtitle("Total Amount of Property\n Damage by Severe 
+                                Weather Type\n in the U.S. from 1950 - 2011")
+CropsGraph <- qplot(EVTYPE, data = Crops, weight = CropDamage, 
+                    geom = "bar") + 
+                    scale_y_continuous("Crops Damage in USD") +
+                    theme(axis.text.x = element_text(angle = 90, 
+                                                     hjust = 1)) +
+                    xlab("Severe Weather") + 
+                    ggtitle("Total Amount of Crops\n Damage by Severe 
+                             Weather Type\n in the U.S. from 1950 - 2011")
+grid.arrange(PropertyGraph, CropsGraph, ncol = 2)
+```
+
+According to the lists and figures above, the severe weather event that resulted in the most damage to property was **floods**. In regards to the severe weather event that resulted in the most damage to crops was **drought**.
+
+Listed below are the two ordered lists for property and crops damages, based on the subset data set.
+
+```{r}
+# Sorted Lists for Original Dataset
+Property.9011
+Crops.9011
+```
+
+Based on the lists above, floods remains as the biggest cause of property damage, while drought remains as the biggest cause of damages to crops.
+
+
+## Conclusion
+
+Based on the analysis conducted above, we find that tornadoes have the biggest impact on public health, with regards to the total number of fatalities and injuries. However, this conclusion does not hold entirely if the period is reduced to 1990 - 2011. Under this period, tornadoes remain as the severe weather event most responsible for injuries. However, excessive heat is now found as the severe weather event most responsible for fatalities.
+
+In regards to the economic impact of severe weather, we found that both floods and droughts have the biggest impact on communities and municipalities' economies, irrespective of the period.
