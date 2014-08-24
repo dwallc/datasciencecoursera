@@ -1,0 +1,29 @@
+Comparing the Normal and Chi-Square Distributions
+========================================================
+author: Desmond Wallace
+date: August 24, 2014
+
+Overview
+========================================================
+
+This app features two graphs, representing three different probability distributions. The first distribution is the standard normal distribution. The second major probability distribution is the chi-square (\chi^2) distribution. Finally, the third major distribution is the student's-t distribution.
+
+Normal Distribution
+========================================================
+
+The normal distribution is the standard normal distribution, with $\mu=0$ and $\sigma=1$.
+
+$\chi^2$ Distribution
+========================================================
+
+The $chi^2$ distribution does not have fixed degrees of freedom. Instead, the app has a slider that ranges from 1 to 50. As the degrees of freedom change, so does the shape of the distribution. This distribution changes such that as the number of degrees of freedom increases, the shape of the distribution becomes more skewed.
+
+Student's-t
+========================================================
+
+The student's-t distribution also does not have fixed degrees of freedom. Just like the $chi^2$ distribution, the shape of the student's-t distribution changes as well. As the number of degrees of freedom increases, the shape of the student's distribution approximates the shape of the normal distribution.
+
+Operating the App
+========================================================
+
+There are two ways to operate this app. The first method is to move the slider to the desired number of degrees of freedom. Once the number of degrees of freedom are chosen, the app will display the graphs of the three distributions that reflect the chosen degrees of freedom. The other method is to press the play button, which is located in the upper right corner. Pressing this button will automatically advance the slider for each degree of freedom. In addition, the graph will automatically display the graphs of the distributions for each degree of freedom.

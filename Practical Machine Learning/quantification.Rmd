@@ -1,0 +1,113 @@
+---
+title: "Quantification of Self"
+author: "Desmond Wallace"
+date: "Sunday, August 24, 2014"
+output:
+  html_document:
+    keep_md: yes
+    number_sections: yes
+    toc: yes
+---
+
+# Course Project Backgroud Information
+
+Using devices such as *Jawbone Up*, *Nike FuelBand*, and *Fitbit* it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how *much* of a particular activity they do, but they rarely quantify *how well they do it*. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: [http://groupware.les.inf.puc-rio.br/har] (http://groupware.les.inf.puc-rio.br/har).
+
+# Purpose
+
+To estimate certain features for the Human Activity Recognition dataset. The method utilized to achieve this objective is gradient boosting (GBM).
+
+# Loading Required Packages
+
+The first step is to load the packages necessary for conducting the analysis.
+
+```{r}
+library(RCurl)
+library(caret)
+library(kernlab)
+library(gbm)
+library(plyr)
+library(rpart)
+```
+
+# Downloading and Cleaning Datasets
+
+Next, I download both the training and test datasets.
+
+```{r}
+URL <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+training.data <- read.csv(file = URL)
+URL2 <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+testing.data <- read.csv(file = URL2)
+```
+
+Then, I remove observations that contain NAs, as well as any columns that are not relevant to the analysis.
+
+```{r}
+training.data.NAs <- apply(training.data, 2, function(x) {
+                                                sum(is.na(x))
+                                              })
+training.data.clean <- training.data[,which(training.data.NAs == 0)]
+training.data.clean <- training.data.clean[,8:dim(training.data.clean)[2]]
+```
+
+# Creating Training and Testing Sub-Datasets from Overall Training Dataset
+
+Now, I partition the cleaned training dataset into a training and testing sub-datasets. The partitioning of the cleaned training dataset is such that 60 percent of the cleaned dataset is used for building the model, while the other 40 percent is used to test the model.
+
+```{r}
+train <- createDataPartition(y = training.data.clean$classe, p = 0.6, list = FALSE)
+training.data.clean.train <- training.data.clean[train,]
+training.data.clean.test <- training.data.clean[-train,]
+```
+
+# Creating the Model
+
+Now, I will now use the GBM method from the 'caret' package to construct the model.
+
+```{r}
+fit.control <- trainControl(method = "repeatedcv", number = 2, repeats = 2)
+training.data.model.train <- train(classe ~ ., data = training.data.clean.train, 
+                                   method = "gbm", trControl = fit.control, 
+                                   verbose = FALSE)
+training.data.model.train
+```
+
+# Cross-Validation
+
+I will now proceed to cross-validation of the model with the testing sub-dataset.
+
+```{r}
+predection.model <-predict(training.data.model.train, training.data.clean.test)
+confusion.matrix <- confusionMatrix(predection.model, training.data.clean.test$classe)
+confusion.matrix$table
+```
+
+# Out of Sample Error and Accuracy
+
+```{r}
+accuracy <- postResample(predection.model, training.data.clean.test$classe)[[1]]
+accuracy
+out.sample.error <- (1-accuracy)*100
+out.sample.error
+```
+
+Based on the results above, the constructed model has an out of sample error of 3.365 percent, with an accuracy of 96.635 percent.
+
+# Application of Model to Testing Dataset
+
+I will now apply the odel created above to the testing dataset.
+
+```{r}
+## Cleaning the dataset
+testing.data.NAs <- apply(testing.data, 2, function(x) {
+                                                sum(is.na(x))
+                                              })
+testing.data.clean <- testing.data[,which(testing.data.NAs == 0)]
+testing.data.clean <- testing.data.clean[,8:dim(testing.data.clean)[2]]
+
+## Conduct Final Prediction
+prediction.model <- predict(training.data.model.train, testing.data.clean)
+prediction.model
+```
+
