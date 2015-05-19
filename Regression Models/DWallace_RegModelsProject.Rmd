@@ -1,0 +1,84 @@
+---
+title: "*Motor Trend* Analysis - Which Transmission is Better?"
+author: "Desmond Wallace"
+date: "Tuesday, May 19, 2015"
+output: pdf_document
+pdf_document:
+    keep_tex: yes
+---
+
+# Executive Summary
+For this project, I attempt to answer two important questions. First, which type of transmission is better for a car's miles per gallon (MPG), automatic or manual? Second, what is the difference in a car's MPG between the two transmission types? In order to answer these two questions, I analyze the data set `mtcars`, and analyze the relationship between transmission type and MPG, while controlling for other possible influences on MPG. The data used to perform this analysis is from the 1974 *Motor Trend* US magazine, including fuel consumption and 10 features of automobile design and performance for 32 automobiles. Each included automobile is either a 1973 or model. The methodology for this report consists of a combination of exploratory analysis and regression analysis. For each analysis, the null hypothesis is that there is not a significant difference in MPG based on transmission type. The alternative hypothesis is that there is in fact a statistically significant difference. Based on the analysis conducted below, it appears that cars with a manual transmission have a better MPG than cars with an automatic transmission.^[This report was authored in R Markdown and compiled to pdf using pdflatex (via knitr). To view the raw source, please visit the [GitHub repo](https://github.com/dwallc/datasciencecoursera/tree/master/Regression%20Models) associated with this project]
+
+# Exploratory Anaylsis
+I begin the analysis with an exploratory look at the relationship between a car's transmission and its miles per gallon (MPG). In the original data set, the variable representing transmission type is treated only as a numeric value. Thus, I create a new variable within the data set that treats transmission type as a factor. Note that for the variable `am`, a value of 0 represents **automatic** transmissions, while a value of 1 represents **manual** transmissions.
+
+```{r}
+data(mtcars)
+library(ggplot2)
+mtcars$am <- factor(mtcars$am, labels = c("Automatic", "Manual"))
+```
+
+Now I proceed to create a plot that displays the difference, if any, in the MPG for cars with an automatic transmission compared to cars with a manual transmission. As shown by the box plot in the appendix, cars with a manual transmission tend to have higher miles per gallon than cars with an automatic transmission. Thus, this initial result provide support for the hypothesis that there is in fact a significant difference in MPG, based on transmission type.
+
+# Inferential Statistics
+In this section, I present an initial statistical test of whether there is a significant difference between MPG based on transmission type. For the purposes of this analysis, I conducted a two-sample t-test, where the two groups represents the two transmission types.
+
+```{r}
+result <- t.test(mpg ~ am, data = mtcars)
+result$estimate
+result$p.value
+```
+
+According to the results, the average MPG for cars with an automatic transmission is 17.14737 miles per gallon. The average MPG for cars with a manual transmission is 24.39231 miles per gallon. More importantly, the $p$-value for this test is 0.001374. Thus, these results provide additional evidence to support the hypothesis that there is difference between transmission types with respect to MPG.
+
+# Regression Analysis
+The first regression model estimated is the bivariate relationship between transmission type and miles per gallon. I choose this initial model specification because the question I am interested in answering is whether a car's transmission type has a statistically significant effect on its MPG.
+
+```{r}
+Basic.Model <- lm(mpg ~ am, data = mtcars)
+summary(Basic.Model)$coef
+```
+
+According to the results, there appears to be a significant relationship between a car's transmission type and its MPG. Cars with an automatic transmission appears to achieve 17.147 miles per gallon. However, cars with a manual transmission appear to achieve 24.392 miles per gallon. This analysis, however, spurs an additional question. Does this relationship holds when other features and aspects of cars are included in the model as controls?
+
+The second model estimated includes all the variables from the data set. The reason for this model specification is that there are other features of cars that may influence MPG, and/or are correlated with transmission type. Failure to include these covariates would result in inefficient standard errors, and possible biased coefficient estimates. These occurrences would result in the drawing of inaccurate conclusions and inferences. Again, some of the variables are classified as numeric and require transformation to factor-type variables.
+
+```{r}
+mtcars$cyl <- factor(mtcars$cyl)
+mtcars$vs <- factor(mtcars$vs)
+mtcars$gear <- factor(mtcars$gear)
+mtcars$carb <- factor(mtcars$carb)
+Full.Model <- lm(mpg ~ ., data = mtcars)
+summary(Full.Model)$coef
+```
+
+According to the full model, cars with an automatic transmission have a MPG of 23.880, holding all other variables constant. However, cars with a manual transmission have a MPG of 25.091, holding all other variables constant. However, the biggest difference between this model and the bivariate model is that the variable representing the car's transmission type has a $p$-Value of 0.7113, while the same variable in the bivariate model has a $p$-Value of 0.000285. Based on these results, I decide to conduct an F-test on the two models, to determine which model is better.
+
+```{r}
+anova(Basic.Model, Full.Model)
+```
+
+According to the ANOVA table above, it appears that the full model has the lower $p$-Value of the two models. Thus, it appears that there is at least one factor, besides transmission type, that significantly influences MPG. Thus, it is important that the regression model includes additional covariates besides the variable of interest.
+
+# Conclusion
+To summarize the results from above, it appears that cars with a manual transmission have a higher MPG than cars with an automatic transmission, holding all other factors constant. Numerically, cars with a manual transmission appear to have a MPG of 25.091. This MPG is approximately 1.212 MPG higher than for cars with an automatic transmission. Such cars have a MPG of 23.880. However, given that the data is from 1974, and that there are only 32 observations in the entire data set, I do not have great confidence in this report's findings.
+
+# Appendix
+## Figure 1 - Boxplot of Differences in Miles per Gallon Based on Transmission Type
+```{r}
+g <- ggplot(aes(am, mpg, fill = am), data = mtcars)
+g + geom_boxplot() + scale_fill_manual(name = "Legend", values = c("red", "yellow"), 
+                                       labels = c("0" = "Automatic", "1" = "Manual")) + 
+  ggtitle("Miles per Gallon by Transmission") + 
+  xlab("Transmission Type") + ylab("Miles per Gallon")
+```
+
+## Figure 2 - Diagnostic Plots of Bivariate and Multivariate Regression Models
+```{r, out.width='15cm', out.height='15cm', fig.show='asis', fig.align='center', warning=FALSE}
+layout(matrix(c(1,2,3,4),2,2))
+plot(Basic.Model)
+layout(matrix(c(1,2,3,4),2,2))
+plot(Full.Model)
+```
+
